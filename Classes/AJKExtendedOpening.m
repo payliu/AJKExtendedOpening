@@ -9,6 +9,11 @@
 #import "AJKExtendedOpening.h"
 #import <objc/runtime.h>
 
+#define TAG_SOURCETREE_APP 0
+#define TAG_GITHUB_APP 1
+
+NSString * const SOURCE_TREE_APP_NAME = @"SourceTree";
+NSString * const GITHUB_APP_NAME = @"GitHub";
 
 NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleIdentifier";
 
@@ -63,12 +68,22 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 			[openInTerminalMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask | NSAlternateKeyMask | NSShiftKeyMask];
 			[fileMenu insertItem:openInTerminalMenuItem atIndex:desiredMenuItemIndex];
 
-            if ([self validateApplication:@"SourceTree"]) {
+            if ([self validateApplication:SOURCE_TREE_APP_NAME]) {
                 desiredMenuItemIndex++;
-                NSMenuItem *openInSourceTreeMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Open Project in SourceTree" action:@selector(openProjectInSourceTree:) keyEquivalent:@""] autorelease];
+                NSMenuItem *openInSourceTreeMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Open Project in SourceTree" action:@selector(openProjectInApplication:) keyEquivalent:@""] autorelease];
                 [openInSourceTreeMenuItem setTarget:self];
                 [openInSourceTreeMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask | NSAlternateKeyMask | NSShiftKeyMask];
+                openInSourceTreeMenuItem.tag = TAG_SOURCETREE_APP;
                 [fileMenu insertItem:openInSourceTreeMenuItem atIndex:desiredMenuItemIndex];
+            }
+
+            if ([self validateApplication:GITHUB_APP_NAME]) {
+                desiredMenuItemIndex++;
+                NSMenuItem *openGitHubMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Open Project in GitHub" action:@selector(openProjectInApplication:) keyEquivalent:@"G"] autorelease];
+                [openGitHubMenuItem setTarget:self];
+                [openGitHubMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask | NSAlternateKeyMask | NSShiftKeyMask];
+                openGitHubMenuItem.tag = TAG_GITHUB_APP;
+                [fileMenu insertItem:openGitHubMenuItem atIndex:desiredMenuItemIndex];
             }
 
 		} else if([NSApp mainMenu]) {
@@ -162,40 +177,45 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 		[[NSWorkspace sharedWorkspace] openFile:projectDirectory withApplication:@"Terminal"];
 }
 
-- (void) openProjectInSourceTree:(id)sender
+- (void) openProjectInApplication:(id)sender
 {
     NSString *projectDirectory = [self projectDirectory];
 
-    if ([projectDirectory length])
-        [[NSWorkspace sharedWorkspace] openFile:projectDirectory withApplication:@"SourceTree"];
+    NSString *appName = [self getApplicationName:((NSMenuItem*)sender).tag];
+
+    if ([projectDirectory length] && [appName length])
+        [[NSWorkspace sharedWorkspace] openFile:projectDirectory withApplication:appName];
+}
+
+- (NSString*) getApplicationName:(NSInteger)tag
+{
+    NSString* appName = nil;
+
+    switch (tag) {
+            
+        case TAG_SOURCETREE_APP:
+            appName = SOURCE_TREE_APP_NAME;
+            break;
+
+        case TAG_GITHUB_APP:
+            appName = GITHUB_APP_NAME;
+            
+        default:
+            break;
+    }
+
+    return appName;
 }
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem
 {
 	if([menuItem action] == @selector(openWithExternalEditor:)) {
 		return [[self currentFileURL] isFileURL];
-	} else if([menuItem action] == @selector(showProjectInFinder:) || [menuItem action] == @selector(openProjectInTerminal:)) {
+	} else if([menuItem action] == @selector(showProjectInFinder:) || [menuItem action] == @selector(openProjectInTerminal:) || [menuItem action] == @selector(openProjectInApplication:)) {
 		return [[self projectDirectory] length] > 0;
-    } else if([menuItem action] == @selector(openProjectInSourceTree:)) {
-        return [self validateGitRepo:[self projectDirectory]];
     }
-	
+    
 	return YES;
-}
-
-- (BOOL) validateGitRepo:(NSString *)path
-{
-    if (path.length == 0) return NO;
-
-    BOOL validate = NO;
-
-    NSFileManager *fileManager = [[NSFileManager alloc] init];
-
-    validate = [fileManager fileExistsAtPath:[path stringByAppendingPathComponent:@".git"]];
-
-    [fileManager release];
-
-    return validate;
 }
 
 #pragma mark - Actions for Menu Items
