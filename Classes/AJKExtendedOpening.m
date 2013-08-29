@@ -62,6 +62,15 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 			[openInTerminalMenuItem setTarget:self];
 			[openInTerminalMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask | NSAlternateKeyMask | NSShiftKeyMask];
 			[fileMenu insertItem:openInTerminalMenuItem atIndex:desiredMenuItemIndex];
+
+            if ([self validateApplication:@"SourceTree"]) {
+                desiredMenuItemIndex++;
+                NSMenuItem *openInSourceTreeMenuItem = [[[NSMenuItem alloc] initWithTitle:@"Open Project in SourceTree" action:@selector(openProjectInSourceTree:) keyEquivalent:@""] autorelease];
+                [openInSourceTreeMenuItem setTarget:self];
+                [openInSourceTreeMenuItem setKeyEquivalentModifierMask:NSCommandKeyMask | NSAlternateKeyMask | NSShiftKeyMask];
+                [fileMenu insertItem:openInSourceTreeMenuItem atIndex:desiredMenuItemIndex];
+            }
+
 		} else if([NSApp mainMenu]) {
 			NSLog(@"AJKExtendedOpening Xcode plugin: Couldn't find an 'Open with External Editor' item in the File menu");
 		}
@@ -70,7 +79,12 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 	return self;
 }
 
+#pragma mark - validate application
 
+- (BOOL) validateApplication:(NSString *)appName
+{
+    return [[NSWorkspace sharedWorkspace] fullPathForApplication:appName].length > 0;
+}
 
 #pragma mark - Actions for Menu Items
 
@@ -148,6 +162,13 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 		[[NSWorkspace sharedWorkspace] openFile:projectDirectory withApplication:@"Terminal"];
 }
 
+- (void) openProjectInSourceTree:(id)sender
+{
+    NSString *projectDirectory = [self projectDirectory];
+
+    if ([projectDirectory length])
+        [[NSWorkspace sharedWorkspace] openFile:projectDirectory withApplication:@"SourceTree"];
+}
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem
 {
@@ -155,12 +176,27 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 		return [[self currentFileURL] isFileURL];
 	} else if([menuItem action] == @selector(showProjectInFinder:) || [menuItem action] == @selector(openProjectInTerminal:)) {
 		return [[self projectDirectory] length] > 0;
-	}
+    } else if([menuItem action] == @selector(openProjectInSourceTree:)) {
+        return [self validateGitRepo:[self projectDirectory]];
+    }
 	
 	return YES;
 }
 
+- (BOOL) validateGitRepo:(NSString *)path
+{
+    if (path.length == 0) return NO;
 
+    BOOL validate = NO;
+
+    NSFileManager *fileManager = [[NSFileManager alloc] init];
+
+    validate = [fileManager fileExistsAtPath:[path stringByAppendingPathComponent:@".git"]];
+
+    [fileManager release];
+
+    return validate;
+}
 
 #pragma mark - Actions for Menu Items
 
@@ -216,7 +252,7 @@ NSString * const AJKExternalEditorBundleIdentifier = @"AJKExternalEditorBundleId
 			NSString *workspacePath = [document valueForKeyPath:@"_workspace.representingFilePath.relativePathOnVolume"];
 			
 			if([workspacePath length])
-				return [workspacePath stringByDeletingLastPathComponent];
+				return [@"/" stringByAppendingPathComponent:[workspacePath stringByDeletingLastPathComponent]];
 		}
 		
 		@catch (NSException *exception) {
